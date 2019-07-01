@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.cognitect:transit-java:0.8.337">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/cognitect/transit-java/0.8.337/transit-java-0.8.337.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/cognitect/transit-java/0.8.337/transit-java-0.8.337-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/cognitect/transit-java/0.8.337/transit-java-0.8.337-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

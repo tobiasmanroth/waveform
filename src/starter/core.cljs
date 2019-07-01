@@ -8,7 +8,8 @@
 (defonce audio-element (atom nil))
 (defonce frequency-values (r/atom (repeat num-frequency-bars 0)))
 (defonce time-domain-values (r/atom (repeat num-frequency-bars 0)))
-(defonce canvas-state (atom {}))
+
+(defonce audio-buffer (atom nil))
 
 (defn init-audio! []
   (let [audio-ctx (new js/AudioContext)
@@ -61,49 +62,53 @@
                     :height "512px"}]])})))
 
 (defn connect-analyzer []
-  (let [source (.createMediaElementSource (:audio-ctx @state) @audio-element)]
+  (let [source (.createBufferSource (:audio-ctx @state))]
+    ;; (.createMediaElementSource (:audio-ctx @state) @audio-element)
+    (set! (.-buffer source) @audio-buffer)
     (.connect source (:analyzer @state))
-    (.connect (:analyzer @state) (.-destination (:audio-ctx @state)))))
-
-(defn get-bytes! [analyser freq-data]
-  (.getByteFrequencyData analyser freq-data)
-  freq-data)
+    (.connect (:analyzer @state) (.-destination (:audio-ctx @state)))
+    (.start source)))
 
 (defn update-loop []
   (js/window.requestAnimationFrame update-loop)
   (.getByteFrequencyData (:analyzer @state) (:frequency-data @state))
   (.getByteTimeDomainData (:analyzer @state) (:time-domain-data @state))
   (reset! frequency-values (array-seq (:frequency-data @state)))
-  (reset! time-domain-values (array-seq (:time-domain-data @state)))
-  )
+  (reset! time-domain-values (array-seq (:time-domain-data @state))))
 
-(defn register-audio-element! []
+(defn register-audio-element! [src]
   (reset! audio-element (js/document.getElementById "audio"))
-
+  (set! (.-src @audio-element) src)
   (.addEventListener @audio-element "canplay" (fn []
-                                                (js/console.log "canplay")
                                                 (connect-analyzer)
                                                 (update-loop))))
 
-(defn bars [state]
-  (fn []
-    [:div
-     {:style {:display "flex"
-              :height "256px"}}
-     (doall
-       (map (fn [index]
-              [:div.bar {:key (str "bar-" index)
-                         :style {:width (str (/ 100.0 num-frequency-bars) "%")
-                                 :height (str (* (/ (nth @state index) 255) 100.0) "%")
-                                 :background-color "red"}}
-               (nth @state index)])
-            (range num-frequency-bars)))]))
+(defn load-audio-file []
+  (let [xhr (js/XMLHttpRequest.)]
+    (.addEventListener xhr "load" (fn [_event]
+                                    (if (= (.-status xhr) 200)
+                                      (do
+                                        (js/console.log "Fully loaded")
+                                        (let [file-reader (js/FileReader.)]
+                                          (.addEventListener file-reader "loadend"
+                                                             (fn []
+                                                               (.then
+                                                                 (.decodeAudioData (:audio-ctx @state) (.-result file-reader))
+                                                                 (fn [result]
+                                                                   (reset! audio-buffer result)
+                                                                   (connect-analyzer)
+                                                                   (update-loop)))))
+                                          (.readAsArrayBuffer file-reader xhr.response)))
+                                      (js/console.error "Loading failed"))))
+
+    (set! (.-responseType xhr) "blob")
+    (.open xhr "get" "example.mp3")
+    (.send xhr nil)))
 
 (defn app []
   [:div
    [:audio#audio
-    {:src "/example.mp3"
-     :controls true}]
+    {:controls true}]
 
    [div-with-canvas frequency-values]
    [div-with-canvas time-domain-values]
@@ -119,7 +124,7 @@
   (init-audio!)
   (r/render [app]
             (.getElementById js/document "app"))
-  (register-audio-element!))
+  (load-audio-file))
 
 (defn ^:export init []
   (start))

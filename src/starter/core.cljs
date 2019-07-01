@@ -1,5 +1,6 @@
 (ns starter.core
-  (:require [reagent.core :as r]))
+  (:require [reagent.core :as r]
+            [starter.dft :as dft]))
 
 (def fft-size 256)
 (def num-frequency-bars (/ fft-size 2))
@@ -70,7 +71,7 @@
     (.start source)))
 
 (defn update-loop []
-  (js/window.requestAnimationFrame update-loop)
+  ;;(js/window.requestAnimationFrame update-loop)
   (.getByteFrequencyData (:analyzer @state) (:frequency-data @state))
   (.getByteTimeDomainData (:analyzer @state) (:time-domain-data @state))
   (reset! frequency-values (array-seq (:frequency-data @state)))
@@ -88,16 +89,21 @@
     (.addEventListener xhr "load" (fn [_event]
                                     (if (= (.-status xhr) 200)
                                       (do
-                                        (js/console.log "Fully loaded")
                                         (let [file-reader (js/FileReader.)]
                                           (.addEventListener file-reader "loadend"
                                                              (fn []
-                                                               (.then
-                                                                 (.decodeAudioData (:audio-ctx @state) (.-result file-reader))
-                                                                 (fn [result]
-                                                                   (reset! audio-buffer result)
-                                                                   (connect-analyzer)
-                                                                   (update-loop)))))
+                                                               (let [array-buffer (.-result file-reader)
+                                                                     s-rate (.-sampleRate (:audio-ctx @state))
+                                                                     slice (.slice array-buffer 0 (/ s-rate 30))]
+
+                                                                 (dft/dft (* 4 js/Math.PI -1) (* 4 js/Math.PI) #(js/Math.sin %))
+                                                                 (js/console.log slice s-rate)
+                                                                 (.then
+                                                                   (.decodeAudioData (:audio-ctx @state) slice)
+                                                                   (fn [result]
+                                                                     (reset! audio-buffer result)
+                                                                     (connect-analyzer)
+                                                                     (update-loop))))))
                                           (.readAsArrayBuffer file-reader xhr.response)))
                                       (js/console.error "Loading failed"))))
 
